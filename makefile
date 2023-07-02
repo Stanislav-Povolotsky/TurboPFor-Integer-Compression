@@ -22,7 +22,8 @@ CC ?= gcc
 CXX ?= g++
 
 #CC=powerpc64le-linux-gnu-gcc
-CL = $(CC)
+CL ?= $(CC)
+AR ?= ar
 #DEBUG=-DDEBUG -g
 DEBUG=-DNDEBUG
 JAVA_HOME ?= /usr/lib/jvm/java-8-openjdk-amd64
@@ -59,16 +60,16 @@ ifeq ($(ARCH),ppc64le)
   _SSE=-D__SSSE3__
   CFLAGS=-mcpu=power9 -mtune=power9 $(_SSE)
 else ifeq ($(ARCH),aarch64)
-  CFLAGS=-march=armv8-a 
+  CFLAGS=-march=armv8-a -fPIC
 ifneq (,$(findstring clang, $(CC)))
-  OPT+=-fomit-frame-pointer 
+  OPT+=-fomit-frame-pointer -fPIC
 #-fmacro-backtrace-limit=0
 endif
   _SSE=-march=armv8-a
 else ifeq ($(ARCH),$(filter $(ARCH),x86_64))
 # set minimum arch sandy bridge SSE4.1 + AVX
   _SSE=-march=corei7-avx -mtune=corei7-avx 
-# _SSE+=-mno-avx -mno-aes
+  #_SSE+=-mno-avx -mno-aes
   _AVX2=-march=haswell
 endif
 
@@ -90,7 +91,7 @@ CFLAGS+=-D_STATIC
 LDFLAGS+=-static
 endif
 
-all: icapp 
+all: libic.a
 
 $(SRC)bitutil_avx2.o: $(SRC)bitutil.c
 	$(CC) -O3 -w $(_AVX2) $(OPT) -c $(SRC)bitutil.c -o $(SRC)bitutil_avx2.o
@@ -113,11 +114,11 @@ $(SRC)transpose_avx2.o: $(SRC)transpose.c
 -include lib/libext.mak
 
 LIB=$(SRC)bic.o $(SRC)bitunpack.o $(SRC)bitpack.o $(SRC)bitutil.o $(SRC)eliasfano.o $(SRC)fp.o $(SRC)transpose.o $(SRC)transpose_.o $(SRC)trlec.o $(SRC)trled.o $(SRC)vp4c.o $(SRC)vp4d.o $(SRC)v8.o $(SRC)v8pack.o $(SRC)vint.o $(SRC)vsimple.o $(SRC)vbit.o 
-ifeq ($(ARCH),x86_64)
-LIB+=$(SRC)vp4c_avx2.o $(SRC)vp4d_avx2.o $(SRC)transpose_avx2.o $(SRC)bitpack_avx2.o $(SRC)bitunpack_avx2.o $(SRC)bitutil_avx2.o
-else
+#ifeq ($(ARCH),x86_64)
+#LIB+=$(SRC)vp4c_avx2.o $(SRC)vp4d_avx2.o $(SRC)transpose_avx2.o $(SRC)bitpack_avx2.o $(SRC)bitunpack_avx2.o $(SRC)bitutil_avx2.o
+#else
 CFLAGS+=-D_NAVX2
-endif
+#endif
 
 ifeq ($(AVX2),1)
 CFLAGS+=$(_AVX2)
@@ -133,7 +134,7 @@ LIB+=$(SRC)iccodec.o
 endif
 
 libic.a: $(LIB)
-	ar cr $@ $+
+	${AR} cr $@ $+
 
 libic.so : $(LIB)
 	$(CC) -shared $+ -o $@
@@ -153,8 +154,8 @@ $(JAVA_SUBDIR)/libic.so : libic.a jic.h jic.c
 $(JAVA_SUBDIR)/jicbench : $(JAVA_SUBDIR)/jicbench.java $(JAVA_SUBDIR)/libic.so
 	cd $(JAVA_SUBDIR) && javac jicbench.java && java -Djava.library.path=. jicbench
 
-icapp: $(SRC)icapp.o libic.a $(OB)
-	$(CL) $^ $(LDFLAGS) -o icapp
+#icapp: $(SRC)icapp.o libic.a $(OB)
+#	$(CL) $^ $(LDFLAGS) -o icapp
 
 myapp: myapp.o libic.a
 	$(CC) $^ $(LDFLAGS) -o myapp
